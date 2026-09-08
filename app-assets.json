@@ -1,0 +1,21 @@
+{
+  "assets": [
+    "./",
+    "./index.html",
+    "./style.css",
+    "./app.js",
+    "./updates.js",
+    "./stacker.js",
+    "./capture.js",
+    "./preferences.js",
+    "./gallery.js",
+    "./gallery-ui.js",
+    "./moon-core.js",
+    "./moon-simulation.js",
+    "./moon-worker.js",
+    "./moon-media.js",
+    "./moon-ui.js",
+    "./manifest.webmanifest",
+    "./icon.svg"
+  ]
+}

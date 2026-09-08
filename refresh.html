@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101218">
+  <meta name="robots" content="noindex">
+  <title>Refresh Still Camera</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #101218; color: #f1f2f6; }
+    body { max-width: 480px; margin: 12vh auto; padding: 24px; }
+    h1 { font-size: 28px; } p { line-height: 1.65; color: #b9c0cf; }
+    button, a { display: block; padding: 16px; border-radius: 12px; font: inherit; text-align: center; margin: 18px 0; }
+    button { width: 100%; border: 0; background: #c9fb92; color: #15200f; font-weight: 600; }
+    button:disabled { opacity: .5; } a { color: #c9fb92; }
+    #refreshError { color: #ffb6b6; } [hidden] { display: none !important; }
+  </style>
+  <script type="module" src="./refresh.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Load the latest Still</h1>
+    <p>This refreshes downloaded app files only. <strong>Your local gallery and saved settings are not deleted.</strong></p>
+    <p>Finish any capture and save unfinished photos first. Keep this page open with an internet connection.</p>
+    <p id="refreshStatus" role="status" aria-live="polite">Tap below to replace an older cached version and open the current app, including Moon lab.</p>
+    <p id="refreshError" role="alert" hidden></p>
+    <button id="refreshStart" type="button">Refresh app</button>
+    <a href="./">Back to Still</a>
+    <noscript>Enable JavaScript in Safari to refresh this app.</noscript>
+  </main>
+</body>
+</html>
