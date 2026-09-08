@@ -10,7 +10,7 @@ developer account.
 
 1. Open the published **HTTPS** GitHub Pages link in Safari.
 2. Tap **Enable camera** and allow camera access.
-3. Choose a duration, or enter a whole number of seconds up to 600.
+3. Tap **Settings** to choose a duration, or enter a whole number of seconds up to 600.
 4. Choose **Smooth motion** for water and clouds, or **Light trails** for moving lights.
 5. Rest the phone on a tripod or a solid surface, then tap **Start exposure**.
 6. Keep the app visible and the screen on. After the shot, tap
@@ -18,12 +18,38 @@ developer account.
 
 If the share sheet does not offer Save Image, download the JPEG or open the
 full-size photo, then press and hold to save it. Photos are not automatically
-written to the Photos library. Save your result before taking another shot
-or closing the page.
+written to the Photos library. Completed shots are saved automatically to the
+app's local gallery. Wait for **Saved to your local gallery** before leaving.
+If storage fails, use Save / Share or Download JPEG before taking another shot.
 
 To install: Safari **Share > Add to Home Screen > Add**. Open online at least
 once and wait for the offline-ready message before using without reception.
 iOS may evict cached website storage, so open the app before heading offline.
+
+## Camera-first controls and local gallery
+
+The shutter stays at the bottom of the screen. Settings collapse during a shot,
+and the capture screen shows both elapsed time and remaining time. Duration,
+stacking mode, shutter delay, and quality are remembered on this device. Camera
+device identifiers are not stored.
+
+Tap **Gallery** to browse completed shots, including explicitly labelled partial
+exposures. Open a photo to share it, download the full-size JPEG, or delete it
+from the gallery after confirmation. Brightness adjustments update the same
+gallery entry rather than creating duplicates. Thumbnails are loaded in pages
+of 12, and full-size photos are loaded only when opened. No older photos are
+automatically deleted.
+
+If a photo or its latest brightness change is not protected in the gallery, the
+app warns before starting another shot. It also requests a browser navigation
+warning, but mobile browsers do not always display these warnings. Wait for the
+saved confirmation rather than relying on the warning.
+
+The gallery uses IndexedDB in this browser, not iCloud or the Photos library.
+Clearing website data, private browsing, and iOS storage cleanup can remove local
+photos. Safari and the Home Screen app may have separate storage. Save important
+shots to Photos or Files as a backup. Interrupted in-progress exposures cannot
+be recovered after iOS terminates the page.
 
 ## What the exposure means
 
@@ -36,7 +62,7 @@ iOS may evict cached website storage, so open the app before heading offline.
 - Brightness can be adjusted from -2 to +3 EV after capturing.
 - The capture timer starts with the first received frame, after the shutter delay.
   The result reports the time between the first and last captured frames.
-- **Finish & keep photo** exports early. **Cancel** discards the exposure.
+- **Finish & keep** exports early. **Cancel & discard shot** discards the exposure.
 - Leaving the app, locking the screen, losing camera frames, or changing camera
   dimensions stops the shot and marks any available result as partial.
 
@@ -59,8 +85,9 @@ Screen lock or iOS termination can prevent saving a shot.
 There are no accounts, analytics, third-party scripts, photo uploads or server
 image processing. GitHub Pages serves the app assets. The camera is requested
 without microphone access. Photos leave the device only through the user's
-chosen sharing action. The app keeps the current photo in memory, not a
-persistent photo gallery.
+chosen sharing action. The app keeps the current render in memory and stores
+completed JPEGs and small thumbnails in an on-device IndexedDB gallery. It stores
+camera preferences in localStorage. Neither photos nor settings are uploaded.
 
 ## Development
 

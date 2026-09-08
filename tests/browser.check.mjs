@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
 import { chromium } from 'playwright';
+import { checkUpgradedUX } from './ux.check.mjs';
 
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: new URL('..', import.meta.url),
@@ -128,9 +129,17 @@ try {
   const enabled = async selector => {
     await page.waitForFunction(id => !document.querySelector(id).disabled && !document.querySelector(id).hidden, selector);
   };
-  const ready = async () => enabled('#shutter');
+  const openSettings = async () => {
+    if (!await page.locator('#settingsPanel').evaluate(panel => panel.open)) await page.click('#settingsToggle');
+    await page.locator('#duration').waitFor({ state: 'visible' });
+  };
+  const ready = async () => {
+    await enabled('#shutter');
+    await openSettings();
+  };
   const result = async () => {
     await enabled('#share');
+    await page.locator('#photoStorage[data-state="saved"]').waitFor();
     assert.equal(await page.locator('#result').isVisible(), true);
     assert.equal(await page.locator('#error').isVisible(), false);
   };
@@ -142,6 +151,8 @@ try {
     bitmap.close();
     return result;
   });
+  assert.equal(await page.locator('#settingsPanel').evaluate(panel => panel.open), false);
+  await openSettings();
   await page.selectOption('#quality', '720');
   await page.selectOption('#delay', '0');
   await page.click('#enable');
@@ -249,6 +260,12 @@ try {
   assert.deepEqual([fullHD.width, fullHD.height], [1920, 1080]);
   const started = performance.now();
   await page.click('#shutter');
+  await enabled('#finish');
+  assert.equal(await page.locator('#settingsPanel').isVisible(), false);
+  assert.equal(await page.locator('#settingsPanel').evaluate(panel => panel.open), false);
+  await page.waitForFunction(() => /00:10 left/.test(document.querySelector('#remaining').textContent));
+  assert.equal(await page.locator('#remaining').isVisible(), true);
+  await page.waitForFunction(() => /00:09 left/.test(document.querySelector('#remaining').textContent));
   await result();
   const elapsed = performance.now() - started;
   assert.ok(elapsed >= 9500 && elapsed < 20000, `Ten-second capture/export took ${elapsed.toFixed(0)}ms`);
@@ -351,6 +368,9 @@ try {
   assert.equal(await subPage.locator('#shutter').isDisabled(), true);
   assert.match(await subPage.title(), /Still/);
   console.log('PASS PWA: GitHub Pages-style subpath assets, manifest scope and offline reload');
+  await context.close();
+  await subContext.close();
+  await checkUpgradedUX({ browser, origin, watchErrors });
   assert.deepEqual(errors, [], 'Unexpected browser JavaScript or console errors');
   console.log('PASS all browser checks (Chromium emulation; not a real iPhone/Safari test)');
 } finally {

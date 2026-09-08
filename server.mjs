@@ -10,6 +10,9 @@ const files = new Map([
   ['/app.js', ['app.js', 'text/javascript']],
   ['/stacker.js', ['stacker.js', 'text/javascript']],
   ['/capture.js', ['capture.js', 'text/javascript']],
+  ['/preferences.js', ['preferences.js', 'text/javascript']],
+  ['/gallery.js', ['gallery.js', 'text/javascript']],
+  ['/gallery-ui.js', ['gallery-ui.js', 'text/javascript']],
   ['/sw.js', ['sw.js', 'text/javascript']],
   ['/manifest.webmanifest', ['manifest.webmanifest', 'application/manifest+json']],
   ['/icon.svg', ['icon.svg', 'image/svg+xml']]

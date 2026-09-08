@@ -1,5 +1,8 @@
 import { CaptureClock, formatTime, parseDuration } from './capture.js';
 import { FrameStacker } from './stacker.js';
+import { loadPreferences, savePreferences } from './preferences.js';
+import { makeThumbnail, savePhoto } from './gallery.js';
+import { LocalGallery } from './gallery-ui.js';
 
 const $ = id => document.getElementById(id);
 const video = $('video');
@@ -23,27 +26,71 @@ let photoURL = null;
 let exportGeneration = 0;
 let exportTimer = null;
 let shot = null;
+let protectedGeneration = -1;
+const gallery = new LocalGallery(id => {
+  if (shot?.id === id && phase === 'result') {
+    protectedGeneration = -1;
+    storageStatus('Removed from the local gallery. Save a copy to Photos or Files before leaving.', 'failed');
+  }
+});
 
 function message(text) { $('status').textContent = text; }
 function error(text) { $('error').textContent = text; $('error').hidden = !text; }
 function notice(text) { $('notice').textContent = text; $('notice').hidden = !text; }
 function busy() { return phase === 'countdown' || phase === 'capturing'; }
+function unsavedResult() { return phase === 'result' && protectedGeneration !== exportGeneration; }
+
+function storageStatus(text, state) {
+  $('photoStorage').textContent = text;
+  $('photoStorage').dataset.state = state;
+  $('retryStorage').hidden = state !== 'failed';
+  $('resultGallery').disabled = state === 'saving';
+}
+
+function updateSettings(remember = false) {
+  const seconds = Number($('duration').value);
+  const valid = Number.isInteger(seconds) && seconds >= 1 && seconds <= 600;
+  $('duration').setCustomValidity(valid ? '' : 'Choose a whole number of seconds from 1 to 600.');
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const label = mode === 'trails' ? 'Light trails' : 'Smooth motion';
+  const duration = valid ? `${seconds}s` : 'Choose 1-600 seconds';
+  $('settingsSummary').textContent = `${duration} / ${label}`;
+  if (!busy()) $('dockSummary').textContent = `${duration} / ${label} / ${$('delay').value}s delay`;
+  document.querySelectorAll('[data-seconds]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.seconds === $('duration').value));
+  });
+  if (remember && valid) {
+    try {
+      savePreferences({ duration: seconds, mode, delay: $('delay').value, quality: $('quality').value });
+      $('preferencesStatus').textContent = 'Settings remembered on this device.';
+    } catch (cause) {
+      $('preferencesStatus').textContent = `Settings could not be remembered: ${cause.message}. They still apply to this session.`;
+    }
+  }
+}
 
 function setPhase(next) {
   phase = next;
+  document.body.dataset.phase = phase;
   const editable = phase === 'idle' || phase === 'ready';
   document.querySelectorAll('#settings input, #settings select, #settings button').forEach(control => { control.disabled = !editable; });
-  $('settings').hidden = phase === 'result';
-  $('enable').hidden = busy() || phase === 'processing' || phase === 'result';
+  $('settingsPanel').hidden = !editable;
+  $('shootingDock').hidden = phase === 'processing' || phase === 'result';
+  $('settingsToggle').disabled = !editable;
+  $('galleryOpen').disabled = !editable;
+  $('enable').hidden = !['idle', 'starting'].includes(phase);
   $('enable').disabled = phase === 'starting';
-  $('enable').textContent = phase === 'ready' ? 'Restart camera' : phase === 'starting' ? 'Opening camera...' : 'Enable camera';
-  $('shutter').hidden = busy() || phase === 'processing' || phase === 'result';
+  $('enable').textContent = phase === 'starting' ? 'Opening camera...' : 'Enable camera';
+  $('restart').hidden = phase !== 'ready';
+  $('shutter').hidden = phase !== 'ready';
   $('shutter').disabled = phase !== 'ready';
   $('finish').hidden = phase !== 'capturing';
   $('finish').disabled = !clock?.frames;
   $('cancel').hidden = !busy();
   $('result').hidden = phase !== 'result';
   $('countdown').hidden = phase !== 'countdown';
+  $('remaining').hidden = phase !== 'capturing';
+  if (!busy()) updateSettings();
 }
 
 function stopStream() {
@@ -255,11 +302,15 @@ function tick() {
   const now = performance.now();
   if (phase === 'countdown') {
     $('countdown').textContent = Math.max(1, Math.ceil((countdownUntil - now) / 1000));
+    $('dockSummary').textContent = `Starts in ${Math.max(1, Math.ceil((countdownUntil - now) / 1000))}s / Keep the phone still`;
     if (now >= countdownUntil) beginCapture();
   } else if (phase === 'capturing') {
     $('clock').textContent = formatTime(clock.elapsed(now) / 1000);
     $('progress').value = Math.min(1, clock.elapsed(now) / clock.duration);
     $('frames').textContent = `${clock.frames.toLocaleString()} frames`;
+    const remaining = formatTime(Math.ceil(Math.max(0, clock.duration - clock.elapsed(now)) / 1000));
+    $('remaining').textContent = `${remaining} left`;
+    $('dockSummary').textContent = `${remaining} remaining / ${shot.mode === 'trails' ? 'Light trails' : 'Smooth motion'}`;
     if (clock.stalled(now) || (!clock.frames && now - captureRequestedAt > 5000)) {
       finish('incomplete', 'No new camera frames arrived. Try enabling the camera again.');
     } else if (clock.complete(now)) {
@@ -275,11 +326,13 @@ function startExposure() {
   try {
     clock = new CaptureClock(parseDuration($('duration').value));
   } catch (cause) {
+    $('settingsPanel').open = true;
     error(cause.message);
     $('duration').focus();
     return;
   }
   shot = {
+    id: crypto.randomUUID(),
     requested: clock.duration / 1000,
     mode: document.querySelector('input[name="mode"]:checked').value,
     date: new Date()
@@ -287,6 +340,9 @@ function startExposure() {
   $('progress').value = 0;
   $('clock').textContent = '00:00';
   $('frames').textContent = '';
+  updateSettings(true);
+  $('settingsPanel').open = false;
+  document.querySelector('.viewfinder').scrollIntoView({ block: 'start' });
   countdownUntil = performance.now() + Number($('delay').value) * 1000;
   setPhase('countdown');
   const generation = ++shotGeneration;
@@ -335,9 +391,35 @@ function clearPhoto() {
   $('openPhoto').removeAttribute('href');
 }
 
+async function protectPhoto(blob, name, generation) {
+  const photo = {
+    id: shot.id, createdAt: shot.date.getTime(), name, blob,
+    width: canvas.width, height: canvas.height,
+    mode: shot.mode, actual: shot.actual, requested: shot.requested,
+    outcome: shot.outcome, exposure: Number($('ev').value)
+  };
+  storageStatus('Saving to your local gallery. Keep this page open...', 'saving');
+  try {
+    const thumbnail = await makeThumbnail(blob);
+    if (generation !== exportGeneration) return;
+    await savePhoto(photo, thumbnail);
+    if (generation === exportGeneration) {
+      protectedGeneration = generation;
+      storageStatus('Saved to your local gallery. Save important shots to Photos or Files too.', 'saved');
+    }
+    await gallery.refresh();
+  } catch (cause) {
+    if (generation === exportGeneration) {
+      storageStatus(`Not saved to the gallery: ${cause.message}. Use Save / Share or Download JPEG before leaving. Free local storage and retry if needed.`, 'failed');
+    }
+  }
+}
+
 function buildPhoto() {
+  error('');
   clearPhoto();
   const generation = exportGeneration;
+  storageStatus('Preparing photo for the local gallery...', 'saving');
   try {
     if (stacker.gl.isContextLost()) throw new Error('Graphics memory was lost. This shot could not be exported.');
     stacker.render(Number($('ev').value));
@@ -345,6 +427,7 @@ function buildPhoto() {
       if (generation !== exportGeneration || phase !== 'result') return;
       if (!blob) {
         error('The photo could not be encoded. Try adjusting brightness to retry, or take a new shot at 720p.');
+        storageStatus('The photo could not be prepared for the gallery. Keep this page open and retry.', 'failed');
         return;
       }
       const stamp = shot.date.toISOString().replace(/[:.]/g, '-');
@@ -357,9 +440,11 @@ function buildPhoto() {
       $('openPhoto').href = photoURL;
       $('openPhoto').hidden = false;
       $('share').disabled = false;
+      void protectPhoto(blob, name, generation);
     }, 'image/jpeg', 0.96);
   } catch (cause) {
     error(`Unable to prepare the photo: ${cause.message}`);
+    storageStatus('The photo is not saved to the gallery. Keep this page open and retry.', 'failed');
   }
 }
 
@@ -390,16 +475,22 @@ function finish(outcome, reason = '') {
   video.hidden = true;
   canvas.hidden = false;
   setPhase('result');
-  message(outcome === 'complete' ? 'Your exposure is ready. Save it before taking another photo.' : 'A partial exposure is ready. Save it before taking another photo.');
+  message(outcome === 'complete' ? 'Your exposure is ready. Save a copy to Photos, or find it in your local gallery.' : 'A partial exposure is ready. Its gallery entry will be marked as partial.');
   if (reason) notice(`${reason} This is a partial exposure, not the full requested duration.`);
   buildPhoto();
 }
 
-$('enable').addEventListener('click', enableCamera);
+$('enable').addEventListener('click', () => {
+  $('settingsPanel').open = false;
+  document.querySelector('.viewfinder').scrollIntoView({ block: 'start' });
+  void enableCamera();
+});
+$('restart').addEventListener('click', enableCamera);
 $('shutter').addEventListener('click', startExposure);
 $('cancel').addEventListener('click', () => cancelShot());
 $('finish').addEventListener('click', () => finish('stopped'));
 $('again').addEventListener('click', () => {
+  if (unsavedResult() && !window.confirm('This photo or its latest brightness change is not saved to the local gallery yet. Save it to Photos or Files first. Discard the current result and take another shot?')) return;
   clearPhoto();
   stacker.releaseImages();
   void enableCamera();
@@ -410,10 +501,20 @@ $('presets').addEventListener('click', event => {
   $('duration').value = button.dataset.seconds;
   $('duration').dispatchEvent(new Event('input'));
 });
-$('duration').addEventListener('input', () => {
-  document.querySelectorAll('[data-seconds]').forEach(button => {
-    button.setAttribute('aria-pressed', String(button.dataset.seconds === $('duration').value));
-  });
+$('duration').addEventListener('input', () => updateSettings(true));
+$('settings').addEventListener('change', () => updateSettings(true));
+$('settingsToggle').addEventListener('click', () => {
+  $('settingsPanel').open = !$('settingsPanel').open;
+  if ($('settingsPanel').open) $('settingsPanel').scrollIntoView({ block: 'start' });
+});
+$('settingsPanel').addEventListener('toggle', () => {
+  $('settingsToggle').setAttribute('aria-expanded', String($('settingsPanel').open));
+});
+$('galleryOpen').addEventListener('click', () => { void gallery.open(); });
+$('resultGallery').addEventListener('click', () => { void gallery.open(); });
+$('retryStorage').addEventListener('click', () => {
+  if (photoFile) void protectPhoto(photoFile, photoFile.name, exportGeneration);
+  else buildPhoto();
 });
 for (const id of ['quality', 'camera']) {
   $(id).addEventListener('change', () => {
@@ -424,6 +525,7 @@ $('ev').addEventListener('input', () => {
   const value = Number($('ev').value);
   $('evLabel').textContent = `${value > 0 ? '+' : ''}${value.toFixed(1)} EV`;
   clearPhoto();
+  storageStatus('Brightness changed. Preparing an updated gallery copy...', 'saving');
   stacker.render(value);
   exportTimer = setTimeout(buildPhoto, 180);
 });
@@ -456,6 +558,12 @@ window.addEventListener('pagehide', () => {
   if (busy()) interrupt('The page was closed or navigated away.');
   stopStream();
 });
+window.addEventListener('beforeunload', event => {
+  if (busy() || unsavedResult()) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+});
 canvas.addEventListener('webglcontextlost', event => {
   event.preventDefault();
   if (busy()) {
@@ -470,7 +578,19 @@ canvas.addEventListener('webglcontextlost', event => {
   $('ev').disabled = true;
   $('again').disabled = true;
 });
+try {
+  const saved = loadPreferences();
+  if (saved) {
+    $('duration').value = String(saved.duration);
+    document.querySelector(`input[name="mode"][value="${saved.mode}"]`).checked = true;
+    $('delay').value = saved.delay;
+    $('quality').value = saved.quality;
+  }
+} catch (cause) {
+  $('preferencesStatus').textContent = `Saved settings could not be loaded: ${cause.message}. Default settings are being used.`;
+}
 setPhase('idle');
+void gallery.refresh();
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('./sw.js').then(async () => {
     await navigator.serviceWorker.ready;
