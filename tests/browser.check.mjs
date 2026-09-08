@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import http from 'node:http';
 import { chromium } from 'playwright';
 import { checkUpgradedUX } from './ux.check.mjs';
+import { runMoonBrowserChecks } from './moon-browser.check.mjs';
 
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: new URL('..', import.meta.url),
@@ -258,14 +259,27 @@ try {
   assert.equal(fullHD.constraints.width.ideal ?? fullHD.constraints.width, 1920);
   assert.equal(fullHD.constraints.height.ideal ?? fullHD.constraints.height, 1080);
   assert.deepEqual([fullHD.width, fullHD.height], [1920, 1080]);
+  await page.evaluate(() => {
+    globalThis.remainingSamples = [];
+    globalThis.remainingObserver = new MutationObserver(() => {
+      const match = document.querySelector('#remaining').textContent.match(/^(\d+):(\d+) left$/);
+      if (match) globalThis.remainingSamples.push(Number(match[1]) * 60 + Number(match[2]));
+    });
+    globalThis.remainingObserver.observe(document.querySelector('#remaining'), { childList: true, subtree: true, characterData: true });
+  });
   const started = performance.now();
   await page.click('#shutter');
   await enabled('#finish');
   assert.equal(await page.locator('#settingsPanel').isVisible(), false);
   assert.equal(await page.locator('#settingsPanel').evaluate(panel => panel.open), false);
-  await page.waitForFunction(() => /00:10 left/.test(document.querySelector('#remaining').textContent));
   assert.equal(await page.locator('#remaining').isVisible(), true);
-  await page.waitForFunction(() => /00:09 left/.test(document.querySelector('#remaining').textContent));
+  await page.waitForFunction(() => globalThis.remainingSamples.some(seconds => seconds < globalThis.remainingSamples[0]));
+  const remainingSamples = await page.evaluate(() => {
+    globalThis.remainingObserver.disconnect();
+    return globalThis.remainingSamples;
+  });
+  assert.ok(remainingSamples.length >= 2 && remainingSamples.every(seconds => seconds >= 0 && seconds <= 10));
+  assert.ok(remainingSamples.at(-1) < remainingSamples[0], 'Visible remaining time decreases during the ten-second capture');
   await result();
   const elapsed = performance.now() - started;
   assert.ok(elapsed >= 9500 && elapsed < 20000, `Ten-second capture/export took ${elapsed.toFixed(0)}ms`);
@@ -371,6 +385,7 @@ try {
   await context.close();
   await subContext.close();
   await checkUpgradedUX({ browser, origin, watchErrors });
+  await runMoonBrowserChecks({ browser, origin, watchErrors });
   assert.deepEqual(errors, [], 'Unexpected browser JavaScript or console errors');
   console.log('PASS all browser checks (Chromium emulation; not a real iPhone/Safari test)');
 } finally {
