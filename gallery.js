@@ -79,7 +79,7 @@ export async function savePhoto(photo, thumbnail) {
     throw new Error('A photo and thumbnail are required for the gallery.');
   }
   const db = await database();
-  const { blob, ...metadata } = photo;
+  const { blob, referenceBlob, ...metadata } = photo;
   await writeTransaction(db, transaction => {
     transaction.objectStore('photos').put(photo);
     transaction.objectStore('entries').put({ ...metadata, thumbnail });
