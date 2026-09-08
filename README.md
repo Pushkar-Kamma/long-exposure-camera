@@ -41,7 +41,7 @@ applying the reload. There is also a **refresh app files** link in the help pane
 
 The shutter stays at the bottom of the screen. Settings collapse during a shot,
 and the capture screen shows both elapsed time and remaining time. Duration,
-stacking mode, shutter delay, and quality are remembered on this device. Camera
+stacking mode, shutter delay, quality, and shake reduction are remembered on this device. Camera
 device identifiers are not stored.
 
 Tap **Gallery** to browse completed shots, including explicitly labelled partial
@@ -90,6 +90,34 @@ Ten minutes of camera and graphics processing uses battery and can heat the
 phone. Select 720p for less GPU memory and processing. A screen wake lock is
 requested during the exposure. If iOS refuses it, the app displays a warning.
 Screen lock or iOS termination can prevent saving a shot.
+
+## Reduce camera shake
+
+In the normal camera's **Settings**, enable **Reduce camera shake** before
+starting an exposure. It is off by default and is remembered for later shots.
+It works with both Smooth motion and Light trails. Moon lab already performs
+its own burst alignment independently of this switch.
+
+The app compares textured patches across the scene to estimate small shifts
+against a stationary background. Frames with reliable background agreement are
+aligned to the starting view before stacking. A moving foreground subject can
+still move through the image, preserving water smoothing and light trails.
+Exposure weights are counted separately for each pixel so missing image edges
+are not averaged as black.
+
+Uncertain frames are skipped instead of being silently blended without
+correction. The capture screen and gallery report how many frames were used.
+Skipped frames can reduce motion smoothing or leave gaps in trails. If only one
+frame can be aligned, the result is marked partial, not a completed long-exposure
+effect. If no frame can be aligned, the app reports the problem and does not save
+a bogus result. Turn the option off or include a clearer stationary background.
+
+This is image-based translation correction, not control of the iPhone's optical
+stabilizer. It cannot repair blur already present inside a frame, large movement,
+camera rotation, perspective changes, or focus errors. A scene where everything
+moves is ambiguous: the app cannot always distinguish moving scenery from a
+moving phone. Keep the phone steady, avoid deliberate panning, and use a tripod
+when possible. Older saved settings without this option still default to off.
 
 ## Moon lab
 

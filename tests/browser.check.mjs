@@ -5,6 +5,7 @@ import http from 'node:http';
 import { chromium } from 'playwright';
 import { checkUpgradedUX } from './ux.check.mjs';
 import { runMoonBrowserChecks } from './moon-browser.check.mjs';
+import { runStabilizationChecks } from './stabilization.check.mjs';
 import { runUpdateChecks } from './updates.check.mjs';
 
 const server = spawn(process.execPath, ['server.mjs'], {
@@ -386,6 +387,7 @@ try {
   await context.close();
   await subContext.close();
   await checkUpgradedUX({ browser, origin, watchErrors });
+  await runStabilizationChecks({ browser, origin, watchErrors });
   await runMoonBrowserChecks({ browser, origin, watchErrors });
   await runUpdateChecks({ browser, origin });
   assert.deepEqual(errors, [], 'Unexpected browser JavaScript or console errors');

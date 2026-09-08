@@ -57,6 +57,33 @@ test('preferences save and load with injected storage round-trip all settings', 
   assert.deepEqual(loadPreferences(storage), { ...valid, duration: 600, quality: '1080' });
 });
 
+test('shake reduction is an optional boolean and legacy preferences remain unchanged', () => {
+  const storage = memoryStorage();
+  assert.deepEqual(validatePreferences(valid), valid);
+  for (const stabilize of [true, false]) {
+    const settings = { ...valid, stabilize };
+    assert.deepEqual(validatePreferences(settings), settings);
+    savePreferences(settings, storage);
+    assert.deepEqual(loadPreferences(storage), settings);
+  }
+  savePreferences(valid, storage);
+  assert.deepEqual(loadPreferences(storage), valid);
+  assert.equal(Object.hasOwn(loadPreferences(storage), 'stabilize'), false);
+});
+
+test('invalid shake-reduction types reject saves and persisted preferences', () => {
+  const storage = memoryStorage();
+  for (const stabilize of ['true', 'false', '', 0, 1, null, [], {}]) {
+    const invalid = { ...valid, stabilize };
+    assert.throws(() => validatePreferences(invalid));
+    savePreferences({ ...valid, stabilize: true }, storage);
+    assert.throws(() => savePreferences(invalid, storage));
+    assert.equal(loadPreferences(storage).stabilize, true);
+    storage.setItem(PREFERENCES_KEY, JSON.stringify(invalid));
+    assert.throws(() => loadPreferences(storage));
+  }
+});
+
 test('preferences reject corrupt JSON and invalid persisted data without silently replacing it', () => {
   const storage = memoryStorage();
   for (const data of ['{broken', 'null', '[]', '{"duration":45}', JSON.stringify({ ...valid, mode: 'bad' })]) {

@@ -13,6 +13,8 @@ const files = new Map([
   ['/refresh.html', ['refresh.html', 'text/html']],
   ['/refresh.js', ['refresh.js', 'text/javascript']],
   ['/stacker.js', ['stacker.js', 'text/javascript']],
+  ['/alignment.js', ['alignment.js', 'text/javascript']],
+  ['/motion-core.js', ['motion-core.js', 'text/javascript']],
   ['/capture.js', ['capture.js', 'text/javascript']],
   ['/preferences.js', ['preferences.js', 'text/javascript']],
   ['/gallery.js', ['gallery.js', 'text/javascript']],

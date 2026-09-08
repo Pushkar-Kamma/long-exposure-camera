@@ -12,22 +12,39 @@ uniform sampler2D previous;
 uniform sampler2D frame;
 uniform int first;
 uniform int trails;
+uniform vec2 offset;
 in vec2 uv;
 out vec4 color;
 vec3 linearize(vec3 c) {
   return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
 }
+vec3 readLinear(ivec2 point) {
+  ivec2 size = textureSize(frame, 0);
+  return linearize(texelFetch(frame, clamp(point, ivec2(0), size - 1), 0).rgb);
+}
+vec3 shiftedSample(vec2 point) {
+  if (all(equal(offset, vec2(0.0)))) return linearize(texture(frame, point).rgb);
+  vec2 position = point * vec2(textureSize(frame, 0)) - 0.5;
+  ivec2 base = ivec2(floor(position));
+  vec2 fraction = fract(position);
+  return mix(mix(readLinear(base), readLinear(base + ivec2(1, 0)), fraction.x),
+             mix(readLinear(base + ivec2(0, 1)), readLinear(base + ivec2(1, 1)), fraction.x), fraction.y);
+}
 void main() {
-  vec3 incoming = linearize(texture(frame, uv).rgb);
-  vec3 old = texture(previous, uv).rgb;
-  vec3 result = first == 1 ? incoming : (trails == 1 ? max(old, incoming) : old + incoming);
-  color = vec4(result, 1.0);
+  vec4 old = first == 1 ? vec4(0.0) : texture(previous, uv);
+  vec2 sourcePoint = uv + offset;
+  if (any(lessThan(sourcePoint, vec2(0.0))) || any(greaterThanEqual(sourcePoint, vec2(1.0)))) {
+    color = old;
+    return;
+  }
+  vec3 incoming = shiftedSample(sourcePoint);
+  color = vec4(trails == 1 ? max(old.rgb, incoming) : old.rgb + incoming, old.a + 1.0);
 }`;
 
 const displaySource = `#version 300 es
 precision highp float;
 uniform sampler2D image;
-uniform float divisor;
+uniform int average;
 uniform float exposure;
 in vec2 uv;
 out vec4 color;
@@ -35,7 +52,9 @@ vec3 encode(vec3 c) {
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
 }
 void main() {
-  vec3 linear = max(texture(image, uv).rgb / divisor * exp2(exposure), vec3(0.0));
+  vec4 sampleValue = texture(image, uv);
+  float divisor = average == 1 ? max(sampleValue.a, 1.0) : 1.0;
+  vec3 linear = max(sampleValue.rgb / divisor * exp2(exposure), vec3(0.0));
   color = vec4(clamp(encode(linear), 0.0, 1.0), 1.0);
 }`;
 
@@ -54,8 +73,8 @@ export class FrameStacker {
     gl.disable(gl.DITHER);
     this.stackProgram = this.program(vertexSource, stackSource);
     this.displayProgram = this.program(vertexSource, displaySource);
-    this.stackUniforms = Object.fromEntries(['previous', 'frame', 'first', 'trails'].map(name => [name, gl.getUniformLocation(this.stackProgram, name)]));
-    this.displayUniforms = Object.fromEntries(['image', 'divisor', 'exposure'].map(name => [name, gl.getUniformLocation(this.displayProgram, name)]));
+    this.stackUniforms = Object.fromEntries(['previous', 'frame', 'first', 'trails', 'offset'].map(name => [name, gl.getUniformLocation(this.stackProgram, name)]));
+    this.displayUniforms = Object.fromEntries(['image', 'average', 'exposure'].map(name => [name, gl.getUniformLocation(this.displayProgram, name)]));
     this.targets = [];
     this.input = null;
     this.frames = 0;
@@ -127,13 +146,16 @@ export class FrameStacker {
         this.releaseImages();
         throw new Error('Not enough graphics memory for this shot. Try 720p quality.');
       }
-      gl.clearColor(0, 0, 0, 1);
+      gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  add(source) {
+  add(source, { x = 0, y = 0 } = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) >= this.canvas.width || Math.abs(y) >= this.canvas.height) {
+      throw new Error('The frame alignment is outside the image. Hold the phone still and start a new exposure.');
+    }
     const gl = this.gl;
     if (gl.isContextLost()) throw new Error('The photo renderer was interrupted. Reload the app.');
     const next = 1 - this.current;
@@ -149,6 +171,7 @@ export class FrameStacker {
     gl.uniform1i(this.stackUniforms.frame, 1);
     gl.uniform1i(this.stackUniforms.first, this.frames === 0 ? 1 : 0);
     gl.uniform1i(this.stackUniforms.trails, this.mode === 'trails' ? 1 : 0);
+    gl.uniform2f(this.stackUniforms.offset, x / this.canvas.width, -y / this.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.current = next;
     this.frames++;
@@ -162,7 +185,8 @@ export class FrameStacker {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.targets[this.current].texture);
     gl.uniform1i(this.displayUniforms.image, 0);
-    gl.uniform1f(this.displayUniforms.divisor, this.mode === 'average' ? this.frames : 1);
+    // The alpha channel counts observations per pixel, so shifted borders never darken.
+    gl.uniform1i(this.displayUniforms.average, this.mode === 'average' ? 1 : 0);
     gl.uniform1f(this.displayUniforms.exposure, exposure);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

@@ -6,6 +6,8 @@
     "./app.js",
     "./updates.js",
     "./stacker.js",
+    "./alignment.js",
+    "./motion-core.js",
     "./capture.js",
     "./preferences.js",
     "./gallery.js",
