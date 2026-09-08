@@ -80,13 +80,72 @@ phone. Select 720p for less GPU memory and processing. A screen wake lock is
 requested during the exposure. If iOS refuses it, the app displays a warning.
 Screen lock or iOS termination can prevent saving a shot.
 
+## Moon lab
+
+Tap **Moon lab** above the normal viewfinder. This is a separate short-burst tool,
+not another long-exposure blend mode.
+
+- **Run simulated demo** processes a deterministic artificial textured disk with
+  movement, noise, blur, and clipped frames. It is not an image of the real Moon.
+  Demo previews are labelled, exported images are watermarked **SIMULATED**, and
+  the gallery keeps the simulation label.
+- **Import photos / video** accepts up to 20 photos of the same Moon at the same
+  zoom/resolution, or one video. Photos are decoded one at a time. Up to the first
+  8 seconds of a video are sampled at roughly 10 frames per second. Use photos
+  under 40 MB each or a video under 250 MB. Browser-decodable formats only, not
+  RAW/DNG. Native Camera JPEGs are a useful fallback when HEIC decoding fails.
+- **Enable Moon camera** opens a separate browser camera session. Choose a
+  specifically named telephoto camera if one is exposed, but generic rear-camera
+  selection does not prove which physical lens is used.
+- **Capture short burst** collects frames for 3, 5, or 8 seconds. This is the
+  collection window, not the sensor shutter time. The app does not claim to
+  override sensor shutter duration, ISO, or focus.
+- Keep Moon lab visible until processing finishes. Leaving the foreground
+  cancels an unfinished Moon capture or import rather than saving a partial stack.
+- Exposure compensation and camera zoom controls only appear when the current
+  track advertises a usable range. Every requested change is read back and must
+  be confirmed. Camera zoom is not labelled as guaranteed optical zoom.
+- **Try still-photo capture** appears only when the browser provides
+  `ImageCapture.takePhoto`. Its output dimensions are measured after capture.
+  Availability does not guarantee full sensor resolution or manual exposure.
+
+For a native-camera import, use a stable support, try 4x or 8x, turn Night mode
+off, lock AE/AF on the Moon, and lower exposure until surface markings appear.
+Native Camera exposure/focus settings do not carry over into Safari.
+
+The detector expects an isolated bright Moon against darker sky, with its outline
+inside the image. Wide landscapes, eclipses, very small disks, and lunar close-ups
+cut off by the frame are outside this initial mode. A detector preview of at most
+512 pixels locates the subject, then the source is cropped at its original scale
+before limiting the lunar region to 384 pixels per side. The crop is never
+digitally enlarged. This preserves more useful lunar pixels from large imports
+than shrinking the entire native image to the video-stream resolution.
+
+The processor rejects unusable/clipped frames, ranks candidates, registers them
+to a real reference, and combines aligned frames conservatively. Processing runs
+in a worker with a bounded candidate pool. No generative model, Moon replacement,
+invented craters, or synthetic detail is applied to real media. A single-frame
+result is explicitly identified as such. The processed result and best single
+frame are available for comparison and are saved together in the local gallery.
+
+More frames do not guarantee better detail. A fully white, clipped Moon cannot
+be restored by darkening or stacking it. If the browser cannot expose the Moon
+correctly, use native-camera imports rather than a fake exposure slider.
+Simulation establishes algorithm behavior on known inputs, not physical iPhone
+camera performance.
+
+Research background: [NASA's Moon photography guidance](https://science.nasa.gov/solar-system/moon/how-to-photograph-the-moon/),
+[Siril registration documentation](https://siril.readthedocs.io/en/stable/preprocessing/registration.html),
+[AutoStakkert lucky imaging](https://www.autostakkert.com/), and
+[WebKit's Image Capture API introduction](https://webkit.org/blog/16574/webkit-features-in-safari-18-4/).
+
 ## Privacy
 
 There are no accounts, analytics, third-party scripts, photo uploads or server
 image processing. GitHub Pages serves the app assets. The camera is requested
 without microphone access. Photos leave the device only through the user's
 chosen sharing action. The app keeps the current render in memory and stores
-completed JPEGs and small thumbnails in an on-device IndexedDB gallery. It stores
+completed JPEGs, optional best-single Moon references, and small thumbnails in an on-device IndexedDB gallery. It stores
 camera preferences in localStorage. Neither photos nor settings are uploaded.
 
 ## Development

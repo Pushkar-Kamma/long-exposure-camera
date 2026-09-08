@@ -3,6 +3,7 @@ import { FrameStacker } from './stacker.js';
 import { loadPreferences, savePreferences } from './preferences.js';
 import { makeThumbnail, savePhoto } from './gallery.js';
 import { LocalGallery } from './gallery-ui.js';
+import { MoonController } from './moon-ui.js';
 
 const $ = id => document.getElementById(id);
 const video = $('video');
@@ -32,7 +33,9 @@ const gallery = new LocalGallery(id => {
     protectedGeneration = -1;
     storageStatus('Removed from the local gallery. Save a copy to Photos or Files before leaving.', 'failed');
   }
+  moon.onGalleryDelete(id);
 });
+const moon = new MoonController({ onSaved: () => gallery.refresh(), openGallery: () => gallery.open() });
 
 function message(text) { $('status').textContent = text; }
 function error(text) { $('error').textContent = text; $('error').hidden = !text; }
@@ -78,6 +81,7 @@ function setPhase(next) {
   $('shootingDock').hidden = phase === 'processing' || phase === 'result';
   $('settingsToggle').disabled = !editable;
   $('galleryOpen').disabled = !editable;
+  $('moonOpen').disabled = busy() || phase === 'starting' || phase === 'processing';
   $('enable').hidden = !['idle', 'starting'].includes(phase);
   $('enable').disabled = phase === 'starting';
   $('enable').textContent = phase === 'starting' ? 'Opening camera...' : 'Enable camera';
@@ -485,6 +489,17 @@ $('enable').addEventListener('click', () => {
   document.querySelector('.viewfinder').scrollIntoView({ block: 'start' });
   void enableCamera();
 });
+$('moonOpen').addEventListener('click', () => {
+  if (unsavedResult() && !window.confirm('The current exposure is not saved to the gallery. Save or download it first. Open Moon lab anyway?')) return;
+  if (phase === 'ready') {
+    stopStream();
+    video.hidden = true;
+    $('placeholder').hidden = false;
+    $('badge').textContent = 'CAMERA OFF';
+    setPhase('idle');
+  }
+  moon.open();
+});
 $('restart').addEventListener('click', enableCamera);
 $('shutter').addEventListener('click', startExposure);
 $('cancel').addEventListener('click', () => cancelShot());
@@ -559,7 +574,7 @@ window.addEventListener('pagehide', () => {
   stopStream();
 });
 window.addEventListener('beforeunload', event => {
-  if (busy() || unsavedResult()) {
+  if (busy() || unsavedResult() || moon.isWorking || moon.hasUnsavedResult) {
     event.preventDefault();
     event.returnValue = '';
   }

@@ -13,6 +13,11 @@ const files = new Map([
   ['/preferences.js', ['preferences.js', 'text/javascript']],
   ['/gallery.js', ['gallery.js', 'text/javascript']],
   ['/gallery-ui.js', ['gallery-ui.js', 'text/javascript']],
+  ['/moon-core.js', ['moon-core.js', 'text/javascript']],
+  ['/moon-simulation.js', ['moon-simulation.js', 'text/javascript']],
+  ['/moon-worker.js', ['moon-worker.js', 'text/javascript']],
+  ['/moon-media.js', ['moon-media.js', 'text/javascript']],
+  ['/moon-ui.js', ['moon-ui.js', 'text/javascript']],
   ['/sw.js', ['sw.js', 'text/javascript']],
   ['/manifest.webmanifest', ['manifest.webmanifest', 'application/manifest+json']],
   ['/icon.svg', ['icon.svg', 'image/svg+xml']]

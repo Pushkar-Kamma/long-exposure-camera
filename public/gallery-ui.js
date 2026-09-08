@@ -9,6 +9,7 @@ export class LocalGallery {
     this.urls = [];
     this.latestURL = null;
     this.selectedURL = null;
+    this.referenceURL = null;
     this.selected = null;
     this.selectedFile = null;
     this.loadGeneration = 0;
@@ -52,9 +53,13 @@ export class LocalGallery {
     this.selected = null;
     this.selectedFile = null;
     if (this.selectedURL) URL.revokeObjectURL(this.selectedURL);
+    if (this.referenceURL) URL.revokeObjectURL(this.referenceURL);
     this.selectedURL = null;
+    this.referenceURL = null;
     $('galleryImage').removeAttribute('src');
     $('galleryDownload').removeAttribute('href');
+    $('galleryReferenceDownload').removeAttribute('href');
+    $('galleryReferenceDownload').hidden = true;
     $('galleryShare').disabled = true;
   }
 
@@ -87,13 +92,13 @@ export class LocalGallery {
           button.type = 'button';
           button.dataset.photoId = entry.id;
           const image = new Image();
-          image.alt = `${entry.actual.toFixed(1)} second ${entry.mode === 'trails' ? 'light trail' : 'smooth motion'} exposure`;
+          image.alt = entry.mode === 'moon' ? (entry.simulated ? 'Simulated Moon test scene' : 'Processed Moon photo') : `${entry.actual.toFixed(1)} second ${entry.mode === 'trails' ? 'light trail' : 'smooth motion'} exposure`;
           image.loading = 'lazy';
           const url = URL.createObjectURL(entry.thumbnail);
           this.urls.push(url);
           image.src = url;
           const label = document.createElement('span');
-          label.textContent = `${entry.actual.toFixed(1)}s / ${entry.outcome === 'complete' ? 'Complete' : 'Partial'}`;
+          label.textContent = entry.mode === 'moon' ? `${entry.simulated ? 'SIMULATED' : 'Moon'} / ${entry.framesUsed || 1} frame(s)` : `${entry.actual.toFixed(1)}s / ${entry.outcome === 'complete' ? 'Complete' : 'Partial'}`;
           button.append(image, label);
           button.addEventListener('click', () => { void this.view(entry.id); });
           $('galleryGrid').append(button);
@@ -121,7 +126,16 @@ export class LocalGallery {
       $('galleryImage').src = this.selectedURL;
       $('galleryDownload').href = this.selectedURL;
       $('galleryDownload').download = photo.name;
-      $('galleryDetails').textContent = `${new Date(photo.createdAt).toLocaleString()} / ${photo.actual.toFixed(1)}s of ${photo.requested}s / ${photo.width} x ${photo.height} / ${photo.mode === 'trails' ? 'Light trails' : 'Smooth motion'}${photo.outcome === 'complete' ? '' : ' / Partial exposure'}`;
+      if (photo.referenceBlob) {
+        this.referenceURL = URL.createObjectURL(photo.referenceBlob);
+        $('galleryReferenceDownload').href = this.referenceURL;
+        $('galleryReferenceDownload').download = photo.name.replace('.jpg', '-best-single.jpg');
+        $('galleryReferenceDownload').hidden = false;
+      }
+      const capture = photo.mode === 'moon'
+        ? `${photo.simulated ? 'SIMULATED test scene, not a Moon photo' : 'Moon / ' + photo.source} / ${photo.framesUsed || 1} frame(s) used`
+        : `${photo.actual.toFixed(1)}s of ${photo.requested}s / ${photo.mode === 'trails' ? 'Light trails' : 'Smooth motion'}${photo.outcome === 'complete' ? '' : ' / Partial exposure'}`;
+      $('galleryDetails').textContent = `${new Date(photo.createdAt).toLocaleString()} / ${photo.width} x ${photo.height} / ${capture}`;
       $('galleryShare').disabled = false;
       $('galleryGrid').hidden = true;
       $('galleryMore').hidden = true;

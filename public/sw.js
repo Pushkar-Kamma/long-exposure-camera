@@ -1,5 +1,5 @@
-const CACHE = 'still-camera-v2';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './stacker.js', './capture.js', './preferences.js', './gallery.js', './gallery-ui.js', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'still-camera-v3';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './stacker.js', './capture.js', './preferences.js', './gallery.js', './gallery-ui.js', './moon-core.js', './moon-simulation.js', './moon-worker.js', './moon-media.js', './moon-ui.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS.map(path => new Request(path, { cache: 'reload' })))));

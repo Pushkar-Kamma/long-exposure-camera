@@ -19,6 +19,7 @@
       <div><h1>Still<span>/</span></h1><p class="eyebrow">LONG EXPOSURE CAMERA</p></div>
       <span class="privacy">ON-DEVICE ONLY</span>
     </header>
+    <button id="moonOpen" class="moon-launch" type="button"><strong>Moon lab</strong><span>Short bursts, native-photo imports, and a simulated demo</span></button>
 
     <section class="viewfinder" aria-label="Camera preview">
       <video id="video" autoplay muted playsinline hidden></video>
@@ -113,8 +114,55 @@
           <button id="galleryShare" class="primary" type="button" disabled>Save / Share</button>
           <a id="galleryDownload" class="button secondary" download>Download JPEG</a>
         </div>
+        <a id="galleryReferenceDownload" class="button secondary" download hidden>Download best single frame</a>
         <button id="galleryDelete" class="discard" type="button">Delete from gallery</button>
       </section>
+    </dialog>
+
+    <dialog id="moonDialog" aria-labelledby="moonTitle">
+      <div class="gallery-heading"><div><h2 id="moonTitle">Moon lab</h2><p class="eyebrow">ALIGN REAL FRAMES. KEEP REAL DETAIL.</p></div><button id="moonClose" class="secondary" type="button">Close</button></div>
+      <p class="hint">A short capture window, not a long shutter exposure. Keep a correctly exposed Moon fully in frame. Burned-out white areas cannot be repaired.</p>
+      <div class="moon-preview">
+        <video id="moonVideo" muted playsinline hidden></video>
+        <canvas id="moonOutput" hidden aria-label="Moon processing preview"></canvas>
+        <p id="moonPlaceholder">Try the simulated demo, import native-camera media, or enable the camera.</p>
+        <span id="moonBadge">NO CAPTURE</span>
+      </div>
+      <progress id="moonProgress" value="0" max="1" aria-label="Moon capture progress"></progress>
+      <p id="moonStatus" role="status" aria-live="polite">Everything is processed on this device. No media is uploaded.</p>
+      <p id="moonError" role="alert" hidden></p>
+      <section id="moonSetup">
+        <div class="row">
+          <button id="moonDemo" class="secondary" type="button">Run simulated demo</button>
+          <label class="button secondary moon-import">Import photos / video<input id="moonFiles" type="file" accept="image/*,video/*" multiple></label>
+        </div>
+        <p class="hint">Import up to 20 photos at the same zoom, or one video. The first 8 seconds of a video are sampled. For native Camera: use 4x or 8x, turn Night mode off, lock AE/AF on the Moon, and reduce exposure until surface markings appear. These settings do not carry over to Safari.</p>
+        <div class="row">
+          <label>Live burst window<select id="moonDuration"><option value="3">3 seconds</option><option value="5" selected>5 seconds</option><option value="8">8 seconds</option></select></label>
+          <label>Camera<select id="moonCamera"><option value="">Rear camera (automatic)</option></select></label>
+        </div>
+        <div class="row">
+          <button id="moonEnable" class="secondary" type="button">Enable Moon camera</button>
+          <button id="moonCapture" class="primary" type="button" disabled>Capture short burst</button>
+        </div>
+        <button id="moonStill" class="secondary" type="button" hidden>Try still-photo capture</button>
+        <label id="moonExposureControl" class="brightness" hidden>Capture exposure <output id="moonExposureValue"></output><input id="moonExposure" type="range"></label>
+        <label id="moonZoomControl" class="brightness" hidden>Camera zoom factor <output id="moonZoomValue"></output><input id="moonZoom" type="range"></label>
+        <details class="moon-capabilities"><summary>Camera capabilities on this browser</summary><p id="moonCapabilities" class="hint">Enable the camera to inspect its actual controls. No focus or optical-zoom control is assumed.</p></details>
+      </section>
+      <button id="moonCancel" class="discard" type="button" hidden>Cancel &amp; discard Moon capture</button>
+      <section id="moonResult" hidden>
+        <p id="moonStats" class="hint"></p>
+        <p id="moonStorage" class="hint" role="status"></p>
+        <button id="moonRetry" class="secondary" type="button" hidden>Retry saving to gallery</button>
+        <div class="row">
+          <button id="moonShare" class="primary" type="button" disabled>Save / Share result</button>
+          <a id="moonDownload" class="button secondary" download hidden>Download result</a>
+        </div>
+        <details><summary>Compare with the best single frame</summary><canvas id="moonReference" aria-label="Best single input frame"></canvas><a id="moonReferenceDownload" class="button secondary" download>Download best single frame</a></details>
+        <button id="moonGallery" class="secondary" type="button">Open local gallery</button>
+      </section>
+      <p class="hint">Keep this screen open while processing. The detector expects an isolated, bright Moon against dark sky. It is not for wide landscapes, an eclipsed Moon, or close-ups that cut off the lunar outline. Cropping the result does not create optical detail.</p>
     </dialog>
 
     <details id="helpPanel">
