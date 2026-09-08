@@ -132,6 +132,11 @@ git push origin pages-update:gh-pages
 git branch -D pages-update
 ```
 
+If a push does not queue a Pages deployment, request a build with an authenticated
+`POST /repos/Pushkar-Kamma/long-exposure-camera/pages/builds` to the GitHub REST
+API. Wait for the new `gh-pages` commit to finish building before treating the
+website as updated.
+
 Update the cache version in `public\sw.js` when changing app assets. An installed
 service worker waits for open app windows to close before activating a new
 version, avoiding mixed old and new files during a shot.
