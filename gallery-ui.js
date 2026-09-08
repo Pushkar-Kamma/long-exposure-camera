@@ -134,7 +134,7 @@ export class LocalGallery {
       }
       const capture = photo.mode === 'moon'
         ? `${photo.simulated ? 'SIMULATED test scene, not a Moon photo' : 'Moon / ' + photo.source} / ${photo.framesUsed || 1} frame(s) used`
-        : `${photo.actual.toFixed(1)}s of ${photo.requested}s / ${photo.mode === 'trails' ? 'Light trails' : 'Smooth motion'}${photo.outcome === 'complete' ? '' : ' / Partial exposure'}`;
+        : `${photo.actual.toFixed(1)}s of ${photo.requested}s / ${photo.mode === 'trails' ? 'Light trails' : 'Smooth motion'}${photo.outcome === 'complete' ? '' : ' / Partial exposure'}${photo.stabilized ? ` / Shake reduction: ${photo.framesUsed}/${photo.framesSampled} frames used` : ''}`;
       $('galleryDetails').textContent = `${new Date(photo.createdAt).toLocaleString()} / ${photo.width} x ${photo.height} / ${capture}`;
       $('galleryShare').disabled = false;
       $('galleryGrid').hidden = true;

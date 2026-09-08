@@ -7,10 +7,14 @@ export function validatePreferences(value) {
   const duration = parseDuration(value.duration);
   if (!['average', 'trails'].includes(value.mode) ||
       !['0', '3', '5', '10'].includes(value.delay) ||
-      !['720', '1080'].includes(value.quality)) {
+      !['720', '1080'].includes(value.quality) ||
+      (value.stabilize !== undefined && typeof value.stabilize !== 'boolean')) {
     throw new Error('Saved camera settings are invalid.');
   }
-  return { duration, mode: value.mode, delay: value.delay, quality: value.quality };
+  return {
+    duration, mode: value.mode, delay: value.delay, quality: value.quality,
+    ...(value.stabilize === undefined ? {} : { stabilize: value.stabilize })
+  };
 }
 
 export function loadPreferences(storage = localStorage) {

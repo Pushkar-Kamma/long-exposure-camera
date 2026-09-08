@@ -5,6 +5,7 @@ import { makeThumbnail, savePhoto } from './gallery.js';
 import { LocalGallery } from './gallery-ui.js';
 import { MoonController } from './moon-ui.js';
 import { setupUpdates } from './updates.js';
+import { CameraMotionTracker } from './motion-core.js';
 
 const $ = id => document.getElementById(id);
 const video = $('video');
@@ -29,6 +30,9 @@ let exportGeneration = 0;
 let exportTimer = null;
 let shot = null;
 let protectedGeneration = -1;
+let motionTracker = null;
+let motionCanvas = null;
+let motionContext = null;
 const gallery = new LocalGallery(id => {
   if (shot?.id === id && phase === 'result') {
     protectedGeneration = -1;
@@ -44,6 +48,18 @@ function notice(text) { $('notice').textContent = text; $('notice').hidden = !te
 function busy() { return phase === 'countdown' || phase === 'capturing'; }
 function unsavedResult() { return phase === 'result' && protectedGeneration !== exportGeneration; }
 
+function trackingStatus(text, limited = false) {
+  const element = $('stabilizationStatus');
+  if (element.textContent !== text) element.textContent = text;
+  element.dataset.state = limited ? 'limited' : 'tracking';
+}
+
+function frameCaption() {
+  return shot.stabilize
+    ? `${stacker.frames.toLocaleString()} used / ${shot.skipped.toLocaleString()} skipped`
+    : `${clock.frames.toLocaleString()} frames`;
+}
+
 function storageStatus(text, state) {
   $('photoStorage').textContent = text;
   $('photoStorage').dataset.state = state;
@@ -58,14 +74,14 @@ function updateSettings(remember = false) {
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const label = mode === 'trails' ? 'Light trails' : 'Smooth motion';
   const duration = valid ? `${seconds}s` : 'Choose 1-600 seconds';
-  $('settingsSummary').textContent = `${duration} / ${label}`;
+  $('settingsSummary').textContent = `${duration} / ${label}${$('stabilize').checked ? ' / Shake reduction' : ''}`;
   if (!busy()) $('dockSummary').textContent = `${duration} / ${label} / ${$('delay').value}s delay`;
   document.querySelectorAll('[data-seconds]').forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.seconds === $('duration').value));
   });
   if (remember && valid) {
     try {
-      savePreferences({ duration: seconds, mode, delay: $('delay').value, quality: $('quality').value });
+      savePreferences({ duration: seconds, mode, delay: $('delay').value, quality: $('quality').value, stabilize: $('stabilize').checked });
       $('preferencesStatus').textContent = 'Settings remembered on this device.';
     } catch (cause) {
       $('preferencesStatus').textContent = `Settings could not be remembered: ${cause.message}. They still apply to this session.`;
@@ -90,11 +106,12 @@ function setPhase(next) {
   $('shutter').hidden = phase !== 'ready';
   $('shutter').disabled = phase !== 'ready';
   $('finish').hidden = phase !== 'capturing';
-  $('finish').disabled = !clock?.frames;
+  $('finish').disabled = !stacker?.frames;
   $('cancel').hidden = !busy();
   $('result').hidden = phase !== 'result';
   $('countdown').hidden = phase !== 'countdown';
   $('remaining').hidden = phase !== 'capturing';
+  $('stabilizationStatus').hidden = !shot?.stabilize || !['countdown', 'capturing', 'result'].includes(phase);
   if (!busy()) updateSettings();
 }
 
@@ -267,15 +284,33 @@ function onFrame(now) {
     return;
   }
   try {
-    stacker.add(video);
-    clock.addFrame(now);
     lastVideoTime = video.currentTime;
-    if (clock.frames === 1) {
+    let offset;
+    if (shot.stabilize) {
+      // Timing follows received frames even when uncertain alignments are excluded.
+      clock.addFrame(now);
+      motionContext.drawImage(video, 0, 0, motionCanvas.width, motionCanvas.height);
+      const alignment = motionTracker.update(motionContext.getImageData(0, 0, motionCanvas.width, motionCanvas.height));
+      if (!alignment.accepted) {
+        shot.skipped++;
+        shot.lastTrackingReason = alignment.reason;
+        trackingStatus(`Frame skipped: ${alignment.reason}`, true);
+        scheduleFrame();
+        return;
+      }
+      offset = { x: alignment.dx * video.videoWidth / motionCanvas.width, y: alignment.dy * video.videoHeight / motionCanvas.height };
+      shot.maxShift = Math.max(shot.maxShift, Math.hypot(offset.x, offset.y));
+      if (Math.hypot(offset.x, offset.y) >= 0.5) shot.correctedFrames++;
+      trackingStatus('Shake reduction active: aligning the stationary background. Keep the phone steady.');
+    }
+    stacker.add(video, offset);
+    if (!shot.stabilize) clock.addFrame(now);
+    if (stacker.frames === 1) {
       // Keep video laid out behind the canvas so Safari continues presenting camera frames.
       canvas.hidden = false;
       $('finish').disabled = false;
     }
-    if (now - lastPreviewAt >= 100 || clock.frames === 1) {
+    if (now - lastPreviewAt >= 100 || stacker.frames === 1) {
       stacker.render();
       lastPreviewAt = now;
     }
@@ -291,6 +326,17 @@ function beginCapture() {
     shot.sourceWidth = video.videoWidth;
     shot.sourceHeight = video.videoHeight;
     stacker.reset(shot.sourceWidth, shot.sourceHeight, shot.mode);
+    motionTracker = null;
+    if (shot.stabilize) {
+      motionTracker = new CameraMotionTracker();
+      if (!motionCanvas) motionCanvas = document.createElement('canvas');
+      const scale = Math.min(1, 160 / Math.max(shot.sourceWidth, shot.sourceHeight));
+      motionCanvas.width = Math.max(1, Math.round(shot.sourceWidth * scale));
+      motionCanvas.height = Math.max(1, Math.round(shot.sourceHeight * scale));
+      motionContext = motionCanvas.getContext('2d', { willReadFrequently: true });
+      if (!motionContext) throw new Error('Shake reduction could not start. Disable it or reload the app.');
+      trackingStatus('Finding a textured, stationary background for shake reduction...');
+    }
     lastPreviewAt = 0;
     lastVideoTime = -1;
     captureRequestedAt = performance.now();
@@ -312,7 +358,7 @@ function tick() {
   } else if (phase === 'capturing') {
     $('clock').textContent = formatTime(clock.elapsed(now) / 1000);
     $('progress').value = Math.min(1, clock.elapsed(now) / clock.duration);
-    $('frames').textContent = `${clock.frames.toLocaleString()} frames`;
+    $('frames').textContent = frameCaption();
     const remaining = formatTime(Math.ceil(Math.max(0, clock.duration - clock.elapsed(now)) / 1000));
     $('remaining').textContent = `${remaining} left`;
     $('dockSummary').textContent = `${remaining} remaining / ${shot.mode === 'trails' ? 'Light trails' : 'Smooth motion'}`;
@@ -340,11 +386,17 @@ function startExposure() {
     id: crypto.randomUUID(),
     requested: clock.duration / 1000,
     mode: document.querySelector('input[name="mode"]:checked').value,
-    date: new Date()
+    date: new Date(),
+    stabilize: $('stabilize').checked,
+    skipped: 0,
+    correctedFrames: 0,
+    maxShift: 0,
+    lastTrackingReason: ''
   };
   $('progress').value = 0;
   $('clock').textContent = '00:00';
   $('frames').textContent = '';
+  trackingStatus('Shake reduction will align small shifts after the countdown.');
   updateSettings(true);
   $('settingsPanel').open = false;
   document.querySelector('.viewfinder').scrollIntoView({ block: 'start' });
@@ -360,6 +412,7 @@ function startExposure() {
 function cancelShot(reason = '') {
   if (!busy()) return;
   clearScheduling();
+  motionTracker = null;
   stacker?.releaseImages();
   canvas.hidden = true;
   video.hidden = !stream;
@@ -401,7 +454,10 @@ async function protectPhoto(blob, name, generation) {
     id: shot.id, createdAt: shot.date.getTime(), name, blob,
     width: canvas.width, height: canvas.height,
     mode: shot.mode, actual: shot.actual, requested: shot.requested,
-    outcome: shot.outcome, exposure: Number($('ev').value)
+    outcome: shot.outcome, exposure: Number($('ev').value),
+    stabilized: shot.stabilize, framesUsed: shot.framesUsed,
+    framesSampled: clock.frames, framesSkipped: shot.skipped,
+    correctedFrames: shot.correctedFrames, maxShift: shot.maxShift
   };
   storageStatus('Saving to your local gallery. Keep this page open...', 'saving');
   try {
@@ -458,15 +514,21 @@ function finish(outcome, reason = '') {
   setPhase('processing');
   clearScheduling();
   stopStream();
-  if (!clock.frames) {
+  motionTracker = null;
+  if (!stacker.frames) {
     stacker.releaseImages();
     setPhase('idle');
     canvas.hidden = true;
     video.hidden = true;
     $('placeholder').hidden = false;
     $('badge').textContent = 'NO PHOTO';
-    error(reason || 'No camera frames were captured. Enable the camera and try again.');
+    error(reason || (shot.stabilize ? `No frames could be aligned. ${shot.lastTrackingReason || 'Include a textured stationary background, or turn off Reduce camera shake.'}` : 'No camera frames were captured. Enable the camera and try again.'));
     return;
+  }
+  shot.framesUsed = stacker.frames;
+  if (shot.stabilize && stacker.frames === 1) {
+    outcome = 'incomplete';
+    reason = reason || 'Only one frame could be aligned. This is a single frame, not the requested long-exposure effect.';
   }
   shot.actual = clock.capturedSeconds;
   shot.outcome = outcome;
@@ -474,14 +536,19 @@ function finish(outcome, reason = '') {
   $('evLabel').textContent = '0 EV';
   $('badge').textContent = outcome === 'complete' ? 'EXPOSURE COMPLETE' : outcome === 'stopped' ? 'FINISHED EARLY' : 'INTERRUPTED / PARTIAL';
   $('clock').textContent = formatTime(outcome === 'complete' ? shot.requested : shot.actual);
-  $('frames').textContent = `${clock.frames.toLocaleString()} frames`;
+  $('frames').textContent = frameCaption();
   $('progress').value = outcome === 'complete' ? 1 : Math.min(1, shot.actual / shot.requested);
-  $('summary').textContent = `${shot.actual.toFixed(1)}s captured / ${shot.requested}s set`;
+  $('summary').textContent = shot.stabilize
+    ? `${stacker.frames}/${clock.frames} frames aligned / ${shot.requested}s set`
+    : `${shot.actual.toFixed(1)}s captured / ${shot.requested}s set`;
   video.hidden = true;
   canvas.hidden = false;
   setPhase('result');
   message(outcome === 'complete' ? 'Your exposure is ready. Save a copy to Photos, or find it in your local gallery.' : 'A partial exposure is ready. Its gallery entry will be marked as partial.');
   if (reason) notice(`${reason} This is a partial exposure, not the full requested duration.`);
+  if (shot.stabilize) {
+    trackingStatus(`${stacker.frames} of ${clock.frames} frames used, ${shot.correctedFrames} shifted, ${shot.skipped} skipped. ${shot.skipped ? 'Skipped frames can reduce motion smoothing or leave gaps in trails.' : 'Small frame shifts were aligned to the starting view.'}`, shot.skipped > 0);
+  }
   buildPhoto();
 }
 
@@ -601,6 +668,7 @@ try {
     document.querySelector(`input[name="mode"][value="${saved.mode}"]`).checked = true;
     $('delay').value = saved.delay;
     $('quality').value = saved.quality;
+    $('stabilize').checked = saved.stabilize === true;
   }
 } catch (cause) {
   $('preferencesStatus').textContent = `Saved settings could not be loaded: ${cause.message}. Default settings are being used.`;

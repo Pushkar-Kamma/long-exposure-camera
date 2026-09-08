@@ -1,4 +1,4 @@
-const CACHE = 'still-camera-v4';
+const CACHE = 'still-camera-v5';
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {

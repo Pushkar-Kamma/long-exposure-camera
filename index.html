@@ -41,6 +41,7 @@
     <p id="status" role="status" aria-live="polite">Use a tripod or rest your phone on something solid.</p>
     <p id="error" role="alert" hidden></p>
     <p id="notice" class="notice" role="status" hidden></p>
+    <p id="stabilizationStatus" class="hint" role="status" hidden></p>
 
     <details id="settingsPanel" class="settings-panel">
       <summary><span id="settingsSummary">10s / Smooth motion</span><span class="settings-edit">Adjust settings</span></summary>
@@ -63,6 +64,8 @@
         <label class="mode"><input type="radio" name="mode" value="average" checked><strong>Smooth motion</strong><span>Average frames for water, clouds, and less noise.</span></label>
         <label class="mode"><input type="radio" name="mode" value="trails"><strong>Light trails</strong><span>Keep the brightest pixels from passing lights.</span></label>
       </div>
+      <label class="stabilize-option"><input id="stabilize" type="checkbox" role="switch" aria-describedby="stabilizeHelp"><strong>Reduce camera shake</strong></label>
+      <p id="stabilizeHelp" class="hint">Optional. Aligns small shifts using a textured, stationary background. Uncertain frames are skipped. Keep the phone steady: this cannot undo blur inside a frame, large movement, or rotation. Moving lights and water should still move.</p>
 
       <div class="row">
         <label>Shutter delay<select id="delay"><option value="0">None</option><option value="3" selected>3 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
@@ -70,7 +73,7 @@
       </div>
       <label class="camera-choice">Camera<select id="camera"><option value="">Rear camera (automatic)</option></select></label>
       <button id="restart" class="secondary" type="button" hidden>Restart camera</button>
-      <p id="preferencesStatus" class="hint" role="status">Duration, mode, delay, and quality are remembered on this device.</p>
+      <p id="preferencesStatus" class="hint" role="status">Duration, mode, delay, quality, and shake reduction are remembered on this device.</p>
       </section>
     </details>
 
