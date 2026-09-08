@@ -25,7 +25,10 @@
       <canvas id="output" hidden aria-label="Stacked exposure preview"></canvas>
       <div id="placeholder"><span class="lens"></span><h2>Let time into the picture.</h2><p>Smooth water. Moving clouds. Light trails.</p></div>
       <div class="viewfinder-top"><span id="badge">CAMERA OFF</span><span id="resolution"></span></div>
-      <div class="viewfinder-bottom"><span id="clock">00:00</span><span id="frames"></span></div>
+      <div class="viewfinder-bottom">
+        <div><span id="clock">00:00</span><small id="clockLabel">ELAPSED</small></div>
+        <div class="frame-stats"><strong id="remaining" hidden></strong><span id="frames"></span></div>
+      </div>
       <div id="countdown" hidden aria-live="polite"></div>
       <progress id="progress" value="0" max="1" aria-label="Exposure progress"></progress>
     </section>
@@ -34,7 +37,9 @@
     <p id="error" role="alert" hidden></p>
     <p id="notice" class="notice" role="status" hidden></p>
 
-    <section id="settings" aria-label="Exposure settings">
+    <details id="settingsPanel" class="settings-panel">
+      <summary><span id="settingsSummary">10s / Smooth motion</span><span class="settings-edit">Adjust settings</span></summary>
+      <section id="settings" aria-label="Exposure settings">
       <div class="section-heading"><h2>Exposure time</h2><span>1 second to 10 minutes</span></div>
       <div id="presets" class="presets">
         <button type="button" data-seconds="10" aria-pressed="true">10s</button>
@@ -59,17 +64,29 @@
         <label>Video quality<select id="quality"><option value="1080" selected>1080p</option><option value="720">720p / less heat</option></select></label>
       </div>
       <label class="camera-choice">Camera<select id="camera"><option value="">Rear camera (automatic)</option></select></label>
-    </section>
+      <button id="restart" class="secondary" type="button" hidden>Restart camera</button>
+      <p id="preferencesStatus" class="hint" role="status">Duration, mode, delay, and quality are remembered on this device.</p>
+      </section>
+    </details>
 
-    <div class="actions">
-      <button id="enable" class="secondary" type="button">Enable camera</button>
-      <button id="shutter" class="primary" type="button" disabled><span class="shutter-dot"></span>Start exposure</button>
-      <button id="finish" class="primary" type="button" hidden>Finish &amp; keep photo</button>
-      <button id="cancel" class="secondary" type="button" hidden>Cancel</button>
+    <div id="shootingDock" class="shooting-dock">
+      <p id="dockSummary">10s / Smooth motion / 3s delay</p>
+      <div class="dock-controls">
+        <button id="settingsToggle" class="dock-side" type="button" aria-expanded="false" aria-controls="settingsPanel">Settings</button>
+        <div class="shutter-controls">
+          <button id="enable" class="primary" type="button">Enable camera</button>
+          <button id="shutter" class="primary" type="button" disabled hidden><span class="shutter-dot"></span>Start exposure</button>
+          <button id="finish" class="primary" type="button" hidden>Finish &amp; keep</button>
+        </div>
+        <button id="galleryOpen" class="dock-side" type="button"><img id="latestThumbnail" alt="" hidden><span>Gallery <span id="galleryCount">0</span></span></button>
+      </div>
+      <button id="cancel" class="discard" type="button" hidden>Cancel &amp; discard shot</button>
     </div>
 
     <section id="result" hidden>
       <div class="section-heading"><h2>Your exposure</h2><span id="summary"></span></div>
+      <p id="photoStorage" class="hint" role="status"></p>
+      <button id="retryStorage" class="secondary" type="button" hidden>Retry saving to gallery</button>
       <label class="brightness">Brightness <output id="evLabel" for="ev">0 EV</output><input id="ev" type="range" min="-2" max="3" step="0.1" value="0"></label>
       <div class="row">
         <button id="share" class="primary" type="button" disabled>Save / Share photo</button>
@@ -77,16 +94,37 @@
       </div>
       <p class="hint">On iPhone, tap Save / Share photo, then <strong>Save Image</strong>. If unavailable, download the JPEG or open it and press and hold to save.</p>
       <a id="openPhoto" target="_blank" rel="noopener" hidden>Open full-size photo</a>
+      <button id="resultGallery" class="secondary" type="button">Open local gallery</button>
       <button id="again" class="secondary" type="button">Take another photo</button>
     </section>
 
-    <details>
+    <dialog id="galleryDialog" aria-labelledby="galleryTitle">
+      <div class="gallery-heading"><h2 id="galleryTitle">Local gallery</h2><button id="galleryClose" class="secondary" type="button">Close</button></div>
+      <p class="hint">Stored only in this browser. Save important photos to Photos or Files too. Clearing website data or iOS storage cleanup can remove this gallery.</p>
+      <p id="galleryStatus" class="hint" role="status"></p>
+      <button id="galleryRetry" class="secondary" type="button" hidden>Retry loading gallery</button>
+      <div id="galleryGrid" class="gallery-grid"></div>
+      <button id="galleryMore" class="secondary" type="button" hidden>Show more photos</button>
+      <section id="galleryViewer" hidden>
+        <button id="galleryBack" class="secondary" type="button">Back to gallery</button>
+        <img id="galleryImage" alt="Saved long-exposure photo">
+        <p id="galleryDetails" class="hint"></p>
+        <div class="row">
+          <button id="galleryShare" class="primary" type="button" disabled>Save / Share</button>
+          <a id="galleryDownload" class="button secondary" download>Download JPEG</a>
+        </div>
+        <button id="galleryDelete" class="discard" type="button">Delete from gallery</button>
+      </section>
+    </dialog>
+
+    <details id="helpPanel">
       <summary>How this works &amp; iPhone tips</summary>
       <p>This app combines video frames over your chosen time. It is a simulated long exposure, not a single sensor exposure. Smooth motion preserves average brightness. Light trails keeps the brightest pixels.</p>
       <p>Keep the phone completely still, with this app visible and the screen on. A call, screen lock, switching apps, or rotating the camera during a shot can interrupt it. If interrupted, the app keeps a partial result when possible and marks it as incomplete.</p>
       <p>Quality is limited to the camera video stream, up to 1080p here. This is not a 48 MP or RAW camera, cannot recover stars that the video camera cannot see, and does not replace Night mode. Rapid lights may leave gaps between video frames. Safari controls the camera's focus and sensor exposure automatically.</p>
       <p>In Safari: Share &gt; Add to Home Screen &gt; Add. No App Store, payment, or developer account is needed. Open once online so the app can cache itself for offline use. Browser storage can be cleared by iOS, so open it before heading somewhere without reception.</p>
       <p>No analytics, uploads, or remote image processing. GitHub serves the app files. Camera frames and exported photos stay on your device unless you choose to share them.</p>
+      <p>Completed photos and brightness changes are saved automatically to this browser's local gallery. Check the saved confirmation before leaving. Local browser storage is not a permanent backup, and Safari and a Home Screen app may have separate storage. Save important shots to Photos or Files.</p>
       <p id="offline">Preparing offline support...</p>
     </details>
     <footer>Made for taking your time.</footer>
