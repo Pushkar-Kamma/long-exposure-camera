@@ -4,6 +4,7 @@ import { loadPreferences, savePreferences } from './preferences.js';
 import { makeThumbnail, savePhoto } from './gallery.js';
 import { LocalGallery } from './gallery-ui.js';
 import { MoonController } from './moon-ui.js';
+import { setupUpdates } from './updates.js';
 
 const $ = id => document.getElementById(id);
 const video = $('video');
@@ -606,13 +607,8 @@ try {
 }
 setPhase('idle');
 void gallery.refresh();
-if ('serviceWorker' in navigator && window.isSecureContext) {
-  navigator.serviceWorker.register('./sw.js').then(async () => {
-    await navigator.serviceWorker.ready;
-    $('offline').textContent = 'Offline app files are ready. Keep this app installed and open it before going offline.';
-  }).catch(cause => {
-    $('offline').textContent = `Offline setup failed: ${cause.message}. An internet connection is needed to reopen the app.`;
-  });
-} else {
-  $('offline').textContent = 'Offline installation is unavailable in this browser.';
-}
+void setupUpdates({
+  canReload: () => !['starting', 'countdown', 'capturing', 'processing'].includes(phase) &&
+    !unsavedResult() && !moon.isWorking && !moon.hasUnsavedResult,
+  onBlocked: notice
+});

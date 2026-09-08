@@ -26,6 +26,17 @@ To install: Safari **Share > Add to Home Screen > Add**. Open online at least
 once and wait for the offline-ready message before using without reception.
 iOS may evict cached website storage, so open the app before heading offline.
 
+If a new feature appears on desktop but not your phone, open
+[Refresh Still](https://pushkar-kamma.github.io/long-exposure-camera/refresh.html)
+in Safari and tap **Refresh app**. This unregisters only this app's service worker
+and removes only Still's versioned application caches. It does not delete the
+IndexedDB gallery, saved preferences, or Photos library. Finish captures and save
+unfinished results first. The repair page requires an internet connection.
+
+App updates do not automatically reload an active camera or an unsaved result.
+When the **Update app** notice appears, finish your shot and let it save before
+applying the reload. There is also a **refresh app files** link in the help panel.
+
 ## Camera-first controls and local gallery
 
 The shutter stays at the bottom of the screen. Settings collapse during a shot,
@@ -196,9 +207,12 @@ If a push does not queue a Pages deployment, request a build with an authenticat
 API. Wait for the new `gh-pages` commit to finish building before treating the
 website as updated.
 
-Update the cache version in `public\sw.js` when changing app assets. An installed
-service worker waits for open app windows to close before activating a new
-version, avoiding mixed old and new files during a shot.
+Update the cache version in `public\sw.js` when changing app assets, and keep
+`public\app-assets.json` complete when adding modules. It is shared by offline
+installation and the mobile repair flow. Fresh worker assets activate without
+forcing any open document to reload. The app offers a user-controlled reload and
+blocks it during capture, processing, or while a result is not saved locally.
+Keep module interfaces compatible with existing open app documents.
 
 ## Native iOS installation
 

@@ -5,6 +5,7 @@ import http from 'node:http';
 import { chromium } from 'playwright';
 import { checkUpgradedUX } from './ux.check.mjs';
 import { runMoonBrowserChecks } from './moon-browser.check.mjs';
+import { runUpdateChecks } from './updates.check.mjs';
 
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: new URL('..', import.meta.url),
@@ -386,6 +387,7 @@ try {
   await subContext.close();
   await checkUpgradedUX({ browser, origin, watchErrors });
   await runMoonBrowserChecks({ browser, origin, watchErrors });
+  await runUpdateChecks({ browser, origin });
   assert.deepEqual(errors, [], 'Unexpected browser JavaScript or console errors');
   console.log('PASS all browser checks (Chromium emulation; not a real iPhone/Safari test)');
 } finally {
