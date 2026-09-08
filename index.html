@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101218">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Long-exposure frame stacking, entirely on your phone. No uploads, accounts, or subscriptions.">
+  <title>Still / Long Exposure</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><h1>Still<span>/</span></h1><p class="eyebrow">LONG EXPOSURE CAMERA</p></div>
+      <span class="privacy">ON-DEVICE ONLY</span>
+    </header>
+
+    <section class="viewfinder" aria-label="Camera preview">
+      <video id="video" autoplay muted playsinline hidden></video>
+      <canvas id="output" hidden aria-label="Stacked exposure preview"></canvas>
+      <div id="placeholder"><span class="lens"></span><h2>Let time into the picture.</h2><p>Smooth water. Moving clouds. Light trails.</p></div>
+      <div class="viewfinder-top"><span id="badge">CAMERA OFF</span><span id="resolution"></span></div>
+      <div class="viewfinder-bottom"><span id="clock">00:00</span><span id="frames"></span></div>
+      <div id="countdown" hidden aria-live="polite"></div>
+      <progress id="progress" value="0" max="1" aria-label="Exposure progress"></progress>
+    </section>
+
+    <p id="status" role="status" aria-live="polite">Use a tripod or rest your phone on something solid.</p>
+    <p id="error" role="alert" hidden></p>
+    <p id="notice" class="notice" role="status" hidden></p>
+
+    <section id="settings" aria-label="Exposure settings">
+      <div class="section-heading"><h2>Exposure time</h2><span>1 second to 10 minutes</span></div>
+      <div id="presets" class="presets">
+        <button type="button" data-seconds="10" aria-pressed="true">10s</button>
+        <button type="button" data-seconds="15" aria-pressed="false">15s</button>
+        <button type="button" data-seconds="30" aria-pressed="false">30s</button>
+        <button type="button" data-seconds="45" aria-pressed="false">45s</button>
+        <button type="button" data-seconds="60" aria-pressed="false">60s</button>
+        <button type="button" data-seconds="120" aria-pressed="false">2m</button>
+        <button type="button" data-seconds="300" aria-pressed="false">5m</button>
+        <button type="button" data-seconds="600" aria-pressed="false">10m</button>
+      </div>
+      <label class="custom-time">Custom seconds<input id="duration" type="number" min="1" max="600" step="1" value="10" inputmode="numeric"></label>
+
+      <h2 class="mode-heading">Stacking mode</h2>
+      <div class="modes">
+        <label class="mode"><input type="radio" name="mode" value="average" checked><strong>Smooth motion</strong><span>Average frames for water, clouds, and less noise.</span></label>
+        <label class="mode"><input type="radio" name="mode" value="trails"><strong>Light trails</strong><span>Keep the brightest pixels from passing lights.</span></label>
+      </div>
+
+      <div class="row">
+        <label>Shutter delay<select id="delay"><option value="0">None</option><option value="3" selected>3 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
+        <label>Video quality<select id="quality"><option value="1080" selected>1080p</option><option value="720">720p / less heat</option></select></label>
+      </div>
+      <label class="camera-choice">Camera<select id="camera"><option value="">Rear camera (automatic)</option></select></label>
+    </section>
+
+    <div class="actions">
+      <button id="enable" class="secondary" type="button">Enable camera</button>
+      <button id="shutter" class="primary" type="button" disabled><span class="shutter-dot"></span>Start exposure</button>
+      <button id="finish" class="primary" type="button" hidden>Finish &amp; keep photo</button>
+      <button id="cancel" class="secondary" type="button" hidden>Cancel</button>
+    </div>
+
+    <section id="result" hidden>
+      <div class="section-heading"><h2>Your exposure</h2><span id="summary"></span></div>
+      <label class="brightness">Brightness <output id="evLabel" for="ev">0 EV</output><input id="ev" type="range" min="-2" max="3" step="0.1" value="0"></label>
+      <div class="row">
+        <button id="share" class="primary" type="button" disabled>Save / Share photo</button>
+        <a id="download" class="button secondary" download="still-exposure.jpg" hidden>Download JPEG</a>
+      </div>
+      <p class="hint">On iPhone, tap Save / Share photo, then <strong>Save Image</strong>. If unavailable, download the JPEG or open it and press and hold to save.</p>
+      <a id="openPhoto" target="_blank" rel="noopener" hidden>Open full-size photo</a>
+      <button id="again" class="secondary" type="button">Take another photo</button>
+    </section>
+
+    <details>
+      <summary>How this works &amp; iPhone tips</summary>
+      <p>This app combines video frames over your chosen time. It is a simulated long exposure, not a single sensor exposure. Smooth motion preserves average brightness. Light trails keeps the brightest pixels.</p>
+      <p>Keep the phone completely still, with this app visible and the screen on. A call, screen lock, switching apps, or rotating the camera during a shot can interrupt it. If interrupted, the app keeps a partial result when possible and marks it as incomplete.</p>
+      <p>Quality is limited to the camera video stream, up to 1080p here. This is not a 48 MP or RAW camera, cannot recover stars that the video camera cannot see, and does not replace Night mode. Rapid lights may leave gaps between video frames. Safari controls the camera's focus and sensor exposure automatically.</p>
+      <p>In Safari: Share &gt; Add to Home Screen &gt; Add. No App Store, payment, or developer account is needed. Open once online so the app can cache itself for offline use. Browser storage can be cleared by iOS, so open it before heading somewhere without reception.</p>
+      <p>No analytics, uploads, or remote image processing. GitHub serves the app files. Camera frames and exported photos stay on your device unless you choose to share them.</p>
+      <p id="offline">Preparing offline support...</p>
+    </details>
+    <footer>Made for taking your time.</footer>
+    <noscript>This camera app needs JavaScript enabled in Safari.</noscript>
+  </main>
+</body>
+</html>
